@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>timerDemo</title>
+    <script src="http://code.jquery.com/jquery.js"></script>
+    <script>
+/*点击“远程给奖励”按钮后立即发送控制信号“reward”，1000ms后再发送默认信号“done”*/
+    function control() {
+       setTimeout(function () { $.post("/control", "done", function () { }) }, 1000);
+       $.post("/control", "reward", function () { });}
+    </script>
+</head>
+<body>
+<!-- “远程给奖励”按钮 -->
+    <div style="text-align: center">
+    <button type="button" onclick="control()">远程给奖励</button><br>
+    </div>
+<!-- 显示视频流的嵌入窗口 --> 
+    <div>
+    <iframe src="http://192.168.137.248:8010" width=1300 height=600></iframe>
+    </div>
+</body>
+</html>  
