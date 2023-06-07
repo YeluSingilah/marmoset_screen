@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>experiment</title>
+	<script src="http://code.jquery.com/jquery.js"></script>
+	 <style>
+/*设置基础格式*/
+	*{
+		margin: 0;
+		padding: 0;}
+	html,body{
+		height: 100%;
+		width: 100%;}
+	.fullscreen{
+		height: 100%;
+		width: 100%;
+		position: fixed;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		position: relative;}
+	.Gifbutton{/*动态图片按钮*/
+		height: 100%;
+		width: 100%;
+		position: absolute;
+		z-index: 3;}
+	.blankbutton{/*背景空白按钮*/
+		height: 100%;
+		width: 100%;
+		position: fixed;
+		z-index: -3;}
+    </style>
+<script>
+/*定义数据格式：包含阶段、选择的按钮、按钮的位置、时间、触摸点坐标、手指序号*/
+var Responsedata = { "stage":[], "button": [], "positionLeft": [], "positionTop": [],  "time": [], "location_x": [], "location_y":[], "finger":[]};
+var relativeHeight = "60%";
+var relativeWidth = "40%";
+var start_time = 0;
+var Responsecount = 0;
+var stage = 2; /*0表示固定位置，1表示随机位置，2表示双选项*/
+var posLeft = "0.3";
+var posTop = "0.2";
+/*设置全屏、初始化*/
+	function requestFullScreen(element) {
+		$.post("/cmd", "Fullscreen", function () { })
+		$("#correct").css("height", relativeHeight);
+		$("#correct").css("width", relativeWidth);
+        $("#wrong").css("height", relativeHeight);
+        $("#wrong").css("width", relativeWidth);
+		var de = document.querySelector(element) || document.documentElement;
+		de.requestFullscreen();
+        		document.getElementById("startface").style.display = "none";
+        		start_time = new Date().getTime();
+        		/*启动轮询函数*/
+        		setInterval(timer, 1000);
+        		localStorage.setItem("marmosetResponse", JSON.stringify(Responsedata));}
+/*监听退出全屏事件*/
+if (document.addEventListener) {
+	document.addEventListener('fullscreenchange', exitHandler, false);}
+function exitHandler() {
+	if (!document.webkitIsFullScreen && !document.mozFullScreen && !document.msFullscreenElement) {
+	document.getElementById("startface").style.display = "inline";}}
+/*触摸动态图片，记录触摸事件，触发奖赏及空白屏*/
+$(function(){
+	$(".Gifbutton").on("touchstart",function(e){
+		var touch = e.originalEvent.touches;
+		var targetTouch = e.originalEvent.targetTouches;
+		var id = this.id
+		Responsedata.stage[Responsecount] = stage;
+		Responsedata.time[Responsecount] = new Date().getTime() - start_time;
+		Responsedata.button[Responsecount] = id;
+		Responsedata.positionLeft[Responsecount] = posLeft;
+		Responsedata.positionTop[Responsecount] = posTop;
+		Responsedata.location_x[Responsecount] = targetTouch[0].pageX;
+		Responsedata.location_y[Responsecount] = targetTouch[0].pageY;
+		Responsedata.finger[Responsecount] = touch.length;
+		localStorage.marmosetResponse = JSON.stringify(Responsedata);
+		Responsecount++;
+		if (this.id == "correct" || this.id == "wrong") {
+			setTimeout(function () { $.post("/cmd", "finish", function () { }) }, 5500);
+/*在随机位置测试中，每个试次后重新生成随机位置*/
+			if (stage == 1) {
+				var ori_num = Math.random() * 3;
+				var num = Math.floor(ori_num);
+				var positionLeft = ["0%", "30%","60%"];
+				var positionLeftName = ["0.0" ,"0.3","0.6"];
+				$("#correct").css("left", positionLeft[num]);
+				$("#wrong").css("left", positionLeft[num]);
+				posLeft = positionLeftName[num]
+				var ori_num = Math.random() * 3;
+				var num = Math.floor(ori_num);
+				var positionTop = ["0%","20%","40%"];
+				var positionTopName = ["0.0", "0.2","0.4"];
+				$("#correct").css("top", positionTop[num]);
+				$("#wrong").css("top", positionTop[num]);
+				posTop = positionTopName[num];}
+			if (stage == 2) {
+				var ori_num = Math.random() * 2;
+				var num = Math.floor(ori_num);
+				var positionLeft = ["5%", "55%"];
+				var positionLeftName = ["0.05", "0.55"];
+				$("#correct").css("left", positionLeft[num]);
+				$("#wrong").css("left", positionLeft[1 - num]);
+				posLeft = positionLeftName[num]}
+			$(".Gifbutton").hide();
+			setTimeout(function () { $(".Gifbutton").show() }, 8000);
+			setTimeout(function () { $.post("/cmd", id, function () { }) }, 500);}});});
+/*空白屏期间触摸，记录触摸事件*/
+$(function(){
+	$(".blankbutton").on("touchstart",function(e){
+		var touch = e.originalEvent.touches;
+		Responsedata.stage[Responsecount] = stage;
+		Responsedata.time[Responsecount] = new Date().getTime() - start_time;
+		Responsedata.button[Responsecount] = this.id;
+		Responsedata.positionTop[Responsecount] = "none";
+		Responsedata.positionLeft[Responsecount] = "none";
+		Responsedata.location_x[Responsecount] = touch[touch.length-1].pageX;
+		Responsedata.location_y[Responsecount] = touch[touch.length-1].pageY;
+		Responsedata.finger[Responsecount] = touch.length;
+		localStorage.marmosetResponse = JSON.stringify(Responsedata);
+		Responsecount++;});});
+/*下载数据*/
+function downloadJSON2CSV(string) {         
+	var array = JSON.parse(string);
+	var str = '';
+	for (var index in array) {
+		var line = '';
+		line += index + ',';
+		line += array[index] + ',';
+		str += line + '\r';}
+	window.open("data:text/csv;charset=utf-8," + str)}
+/*定义轮询函数，当收到reward信号时触发相当于正确触摸图片的一系列事件*/	
+function timer() {
+                $.post("../get_control", function (data, status) { 
+if(data == "reward"){
+setTimeout(function () { $.post("/cmd", "finish", function () { }) }, 5500);
+$(".Gifbutton").hide();
+setTimeout(function () { $(".Gifbutton").show() }, 8000);
+setTimeout(function () { $.post("/cmd", "correct", function () { }) }, 500);
+Responsedata.stage[Responsecount] = stage;
+Responsedata.time[Responsecount] = new Date().getTime() - start_time;
+Responsedata.button[Responsecount] = "manual";
+Responsedata.positionLeft[Responsecount] = posLeft;
+Responsedata.positionTop[Responsecount] = posTop;
+Responsedata.location_x[Responsecount] = "manual";
+Responsedata.location_y[Responsecount] = "manual";
+Responsedata.finger[Responsecount] = "0";
+localStorage.marmosetResponse = JSON.stringify(Responsedata);
+Responsecount++;
+}}, "text");}
+</script>
+</head>
+<body>
+<div id="startface" style="z-index:4;">
+    <button onclick="requestFullScreen()" style="display: inline; z-index:4;">全屏</button>
+    <button onclick="downloadJSON2CSV(localStorage.marmosetResponse)" style="display:inline; z-index:4;">下载行为数据</button>
+</div>
+<div id="container" class='fullscreen' style="z-index:3;">
+	<button id='correct' class='Gifbutton' style="background: url(img/mosquito.gif); background-repeat: no-repeat; background-size: 100% 100%; z-index:3" ></button>
+	<button id='wrong' class='Gifbutton' style="background: url(img/dragonfly_blue.gif); background-repeat: no-repeat; background-size: 100% 100%; z-index:2" ></button>
+	<button id='outside' class='Gifbutton' style="background: #000000; background-repeat: no-repeat; background-size: 100% 100%; z-index:1" ></button>
+	<button id='blank' class='blankbutton' style="background: #000000; background-repeat: no-repeat; background-size: 100% 100%;" ></button>
+</div>
+</body>
+</html>
